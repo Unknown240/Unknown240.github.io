@@ -4,7 +4,6 @@ const sessionUrl = "https://vlscppe.microsoft.com/fp/tags?org_id=y6jn8c31&sessio
 
 const apiUrl = "https://massgrave.dev/api/msdl/"
 
-
 const sessionId = document.getElementById('msdl-session-id');
 const msContent = document.getElementById('msdl-ms-content');
 const pleaseWait = document.getElementById('msdl-please-wait');
@@ -13,204 +12,230 @@ const processingError = document.getElementById('msdl-processing-error');
 const productsList = document.getElementById('products-list');
 const backToProductsDiv = document.getElementById('back-to-products');
 
-var msdlXhr = new XMLHttpRequest();
+const sharedSessionGUID = "47cbc254-4a79-4be6-9866-9c625eb20911";
 
-var availableProducts = {};
+let availableProducts = {};
+let sharedSession = false;
+let shouldUseSharedSession = true;
+let skuId;
 
 function uuidv4() {
-    return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
         (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
     );
 }
 
 function updateVars() {
-    var id = document.getElementById('product-languages').value;
-    if(id == "") {
+    let id = document.getElementById('product-languages').value;
+    if (id == "") {
         document.getElementById('submit-sku').disabled = 1;
         return;
     }
 
-    id = JSON.parse(id);
     document.getElementById('submit-sku').disabled = 0;
 
-    return id;
-}
-
-function checkForError(content) {
-    var errorMessage = document.getElementById('errorModalMessage');
-
-    if(errorMessage) {
-        processingError.style.display = "block";
-        content.style.display = "none";
-        return true;
-    }
-
-    return false;
+    return JSON.parse(id)['id'];
 }
 
 function updateContent(content, response) {
     content.innerHTML = response;
-    return !checkForError(content);
-}
+    let errorMessage = document.getElementById('errorModalMessage');
 
-function abortAndHide() {
-    msdlXhr.abort();
+    if (errorMessage) {
+        processingError.style.display = "block";
+        return false;
+    }
 
-    msContent.style.display = 'none';
-    pleaseWait.style.display = 'none';
-    processingError.style.display = 'none';
-
-    window.location.hash = "";
-}
-
-function fixSubmitSku() {
-    var submitSku = document.getElementById('submit-sku');
-    submitSku.setAttribute("onClick", "getDownload();");
-}
-
-function fixProdLang() {
-    var prodLang = document.getElementById('product-languages');
-    prodLang.setAttribute("onChange", "updateVars();");
-}
-
-function fixLanguageList() {
-    fixSubmitSku();
-    fixProdLang();
+    return true;
 }
 
 function onLanguageXhrChange() {
-    if(!(this.readyState == 4 && this.status == 200))
+    if (!(this.status == 200))
         return;
-    
-    if(pleaseWait.style.display != "block")
+
+    if (pleaseWait.style.display != "block")
         return;
 
     pleaseWait.style.display = "none";
     msContent.style.display = "block";
 
-    if(!updateContent(msContent, this.responseText))
+    if (!updateContent(msContent, this.responseText))
         return;
 
-    fixLanguageList();
+    let submitSku = document.getElementById('submit-sku');
+    submitSku.setAttribute("onClick", "getDownload();");
+
+    let prodLang = document.getElementById('product-languages');
+    prodLang.setAttribute("onChange", "updateVars();");
+
     updateVars();
 }
 
 function onDownloadsXhrChange() {
-    if(!(this.readyState == 4 && this.status == 200))
-        return;
-    
-    if(pleaseWait.style.display != "block")
+    if (!(this.status == 200))
         return;
 
-    pleaseWait.style.display = "none";
+    if (pleaseWait.style.display != "block")
+        return;
+
     msContent.style.display = "block";
 
-    if(!updateContent(msContent, this.responseText))
+    let wasSuccessful = updateContent(msContent, this.responseText);
+
+    if (wasSuccessful) {
+        pleaseWait.style.display = "none";
+        if (!sharedSession) {
+            fetch(sessionUrl + sharedSessionGUID);
+            fetch(sessionUrl + "de40cb69-50a5-415e-a0e8-3cf1eed1b7cd");
+        }
+    }
+    else if (!sharedSession && shouldUseSharedSession) {
+        useSharedSession();
+    }
+    else {
+        getFromServer();
+    }
+}
+
+function getFromServer() {
+    processingError.style.display = "none";
+    let url = apiUrl + "proxy" + "?product_id=" + window.location.hash.substring(1) +
+        "&sku_id=" + skuId;
+    let xhr = new XMLHttpRequest();
+    xhr.onload = displayResponseFromServer;
+    xhr.open("GET", url, true);
+    xhr.send();
+}
+
+function displayResponseFromServer() {
+    pleaseWait.style.display = "none";
+
+    if (!(this.status == 200)) {
+        processingError.style.display = "block";
+        alert(JSON.parse(this.responseText)["Error"])
         return;
+    }
+    msContent.innerHTML = this.responseText
 }
 
 function getLanguages(productId) {
-    sessionId.value = uuidv4();
+    let url = langsUrl + "&productEditionId=" + productId +
+        "&sessionId=" + (sharedSession ? sharedSessionGUID : sessionId.value);
 
-    msContent.style.display = "none";
-    pleaseWait.style.display = "block";
-
-    var url = langsUrl + "&productEditionId=" + encodeURIComponent(productId) + 
-        "&sessionId=" + encodeURIComponent(sessionId.value);
-
-    msdlXhr.abort();
-    msdlXhr.onreadystatechange = onLanguageXhrChange;
-    msdlXhr.open("GET", url, true);
-    msdlXhr.send();
+    let xhr = new XMLHttpRequest();
+    xhr.onload = onLanguageXhrChange;
+    xhr.open("GET", url, true);
+    xhr.send();
 }
 
 function getDownload() {
     msContent.style.display = "none";
     pleaseWait.style.display = "block";
 
-    var id = updateVars();
+    skuId = skuId ? skuId : updateVars();
 
-    var url = downUrl + "&skuId=" + encodeURIComponent(id['id']) +
-        "&language=" + encodeURIComponent(id['language'])+ 
-        "&sessionId=" + encodeURIComponent(sessionId.value);
+    let url = downUrl + "&skuId=" + skuId + "&sessionId=" + (sharedSession ? sharedSessionGUID : sessionId.value);
 
-    msdlXhr.abort();
-    msdlXhr.onreadystatechange = onDownloadsXhrChange;
-    msdlXhr.open("GET", url, true);
-    msdlXhr.send();
+    let xhr = new XMLHttpRequest();
+    xhr.onload = onDownloadsXhrChange;
+    xhr.open("GET", url, true);
+    xhr.send();
 }
 
 function backToProducts() {
-    abortAndHide();
-
     backToProductsDiv.style.display = 'none';
     productsList.style.display = 'block';
+    msContent.style.display = 'none';
+    pleaseWait.style.display = 'none';
+    processingError.style.display = 'none';
+
+    window.location.hash = "";
+    skuId = null;
+}
+
+function useSharedSession() {
+    sharedSession = true;
+    retryDownload();
+}
+
+function retryDownload() {
+    pleaseWait.style.display = "block";
+    processingError.style.display = 'none';
+
+    let url = langsUrl + "&productEditionId=" + window.location.hash.substring(1) + "&sessionId=" + sharedSessionGUID;
+    let xhr = new XMLHttpRequest();
+    xhr.onload = getDownload;
+    xhr.open("GET", url);
+    xhr.send();
+
 }
 
 function prepareDownload(id) {
     productsList.style.display = 'none';
     backToProductsDiv.style.display = 'block';
+    pleaseWait.style.display = "block";
 
-    return getLanguages(id);
+    const xhr = new XMLHttpRequest();
+    xhr.onerror = () => { getLanguages(id) };
+    xhr.open("GET", sessionUrl + sessionId.value, true);
+    xhr.send();
 }
 
 function addTableElement(table, value, data) {
-    var a = document.createElement('a')
+    let a = document.createElement('a')
     a.href = "#" + value;
     a.setAttribute("onClick", "prepareDownload(" + value + ");");
     a.appendChild(document.createTextNode(data[value]))
 
-    var tr = table.insertRow();
+    let tr = table.insertRow();
 
-    var td = tr.insertCell();
+    let td = tr.insertCell();
     td.appendChild(a);
 
-    var td2 = tr.insertCell();
+    let td2 = tr.insertCell();
     td2.appendChild(document.createTextNode(value))
 }
 
 function createTable(data, search) {
-    var table = document.getElementById('products-table-body');
-    var regex = new RegExp('' + search + '', 'ig');
+    let table = document.getElementById('products-table-body');
+    let regex = new RegExp('' + search + '', 'ig');
 
     table.innerHTML = "";
 
-    for(value in data) {
-        if(data[value].match(regex) == null)
+    for (value in data) {
+        if (data[value].match(regex) == null)
             continue;
-    
+
         addTableElement(table, value, data);
     }
 }
 
 function updateResults() {
-    var search = document.getElementById('search-products');
+    let search = document.getElementById('search-products');
     createTable(availableProducts, search.value);
 }
 
 function setSearch(query) {
-    var search = document.getElementById('search-products');
+    let search = document.getElementById('search-products');
     search.value = query;
     updateResults();
 }
 
 function checkHash() {
-    var hash = window.location.hash;
-    if(hash.length == 0)
+    let hash = window.location.hash;
+    if (hash.length == 0)
         return
 
     prepareDownload(hash.substring(1))
 }
 
 function preparePage(resp) {
-    var products = JSON.parse(resp);
-    if(!products['products']) {
+    availableProducts = JSON.parse(resp);
+    if (!availableProducts) {
         pleaseWait.style.display = 'none';
         processingError.style.display = 'block';
         return;
     }
-
-    availableProducts = products['products'];
 
     pleaseWait.style.display = 'none';
     productsList.style.display = 'block';
@@ -219,13 +244,12 @@ function preparePage(resp) {
     checkHash();
 }
 
-var xhr = new XMLHttpRequest();
+sessionId.value = uuidv4();
 
-xhr.onreadystatechange = function() {
-    if(this.readyState != 4)
-        return;
+let xhr = new XMLHttpRequest();
 
-    if(this.status != 200) {
+xhr.onload = function () {
+    if (this.status != 200) {
         pleaseWait.style.display = 'none';
         processingError.style.display = 'block';
         return;
@@ -238,3 +262,13 @@ xhr.open("GET", 'data/products.json', true);
 xhr.send();
 
 pleaseWait.style.display = 'block';
+
+let mxhr = new XMLHttpRequest();
+
+mxhr.onload = function () {
+    if (this.status != 200) {
+        shouldUseSharedSession = false;
+    }
+};
+mxhr.open("GET", apiUrl + "use_shared_session", true);
+mxhr.send();
