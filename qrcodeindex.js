@@ -180,7 +180,7 @@ function makeCode() {
 
   // Check for non-empty url
   if (!url) {
-    alert("Error: empty input");
+    alert("Error: URL / TEXT FIELD IS REQUIRED");
     elementText.focus();
     return;
   }
